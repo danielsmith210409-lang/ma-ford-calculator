@@ -529,6 +529,17 @@
         const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = 'Milling_Logs.csv';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
+
+    // --- NEW: SERVICE WORKER REGISTRATION SCRIPT ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').then(function(registration) {
+                console.log('ServiceWorker registration successful');
+            }, function(err) {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
 </script>
 </body>
 </html>
