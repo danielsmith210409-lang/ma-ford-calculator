@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Technical Sales Calculator</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0056b3">
+    <link rel="manifest" href="manifest.json">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #0056b3;
+            --bg: #f4f7f6;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --border: #dddddd;
+            --mrr-bg: #e8f4fd;
+            --success: #28a745;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 10px; margin: 0; padding-bottom: 80px; }
+        h1 { font-size: 1.3rem; text-align: center; color: var(--primary); margin: 5px 0 15px 0; }
+        
+        /* Tabs */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; display: flex; border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
+        .nav-btn { flex: 1; padding: 15px 0; border: none; background: none; font-size: 0.9rem; font-weight: 600; color: #666; cursor: pointer; }
+        .nav-btn.active { color: var(--primary); border-top: 3px solid var(--primary); background: #f8faff; }
+
+        /* Cards & Inputs */
+        .card { background: var(--card-bg); border-radius: 8px; padding: 12px; margin-bottom: 15px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .card-header { font-weight: bold; font-size: 1rem; margin-bottom: 12px; border-bottom: 2px solid var(--border); padding-bottom: 5px; color: var(--primary); }
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .input-group { display: flex; flex-direction: column; }
+        .full-width { grid-column: span 2; }
+        label { font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; color: #555; }
+        input { font-size: 1rem; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; width: 100%; text-align: center;}
+        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0,86,179,0.2); }
+        
+        /* Results */
+        .results-card { background-color: var(--mrr-bg); border: 1px solid #b8daff; text-align: center; }
+        .mrr-value { font-size: 1.8rem; font-weight: bold; color: var(--primary); margin: 5px 0; }
+        
+        /* Buttons */
+        button.action-btn { background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+        button.action-btn.secondary { background: #6c757d; }
+        button.action-btn.danger { background: #dc3545; }
+        button.action-btn.success { background: #17a2b8; }
+        
+        /* Log Table */
+        .table-container { overflow-x: auto; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--border); background: #fff;}
+        table { width: 100%; min-width: 600px; border-collapse: collapse; text-align: left; }
+        th { background: #f8f9fa; position: sticky; top: 0; padding: 8px;}
+        td { padding: 8px; border-bottom: 1px solid #eee; }
+
+        /* Compare Grid */
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;}
+        .col-header { text-align: center; font-weight: bold; font-size: 0.9rem; padding: 5px; border-radius: 4px;}
+        .col-current { background: #e9ecef; }
+        .col-proposed { background: #e8f4fd; color: var(--primary); }
+        .compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; align-items: end;}
+        .compare-result { text-align: center; padding: 15px; border-radius: 8px; margin-top: 10px; background: #fff; border: 1px solid var(--border);}
+        .gain-text { color: var(--success); font-size: 1.5rem; font-weight: bold; margin: 5px 0;}
+
+        /* PRINT STYLES */
+        #report-print-view { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            body { background-color: white; padding: 0; }
+            #report-print-view, #report-print-view * { visibility: visible; }
+            #report-print-view { position: absolute; left: 0; top: 0; width: 100%; display: block; padding: 20px; }
+            .nav-bar { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="report-print-view"></div>
+
+    <h1>Technical Sales Calculator</h1>
+
+    <div id="tab-calc" class="tab-content active">
+        <div class="card">
+            <div class="card-header">1. Tool Geometry</div>
+            <div class="input-grid">
+                <div class="input-group"><label>Diameter (D)</label><input type="number" id="dia" inputmode="decimal"></div>
+                <div class="input-group"><label>Flutes (Z)</label><input type="number" id="flutes" inputmode="numeric"></div>
+                <div class="input-group"><label>Axial Depth (AP)</label><input type="number" id="ap" inputmode="decimal"></div>
+                <div class="input-group"><label>Radial Depth (AE)</label><input type="number" id="ae" inputmode="decimal"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">2. Speeds & Feeds</div>
+            <div class="input-grid">
+                <div class="input-group"><label>Surface Speed (Vc)</label><input type="number" id="vc" inputmode="decimal" placeholder="m/min"></div>
+                <div class="input-group"><label>Spindle Speed (RPM)</label><input type="number" id="rpm" inputmode="numeric" placeholder="rev/min"></div>
+                <div class="input-group"><label>Feed Per Tooth (fz)</label><input type="number" id="fz" inputmode="decimal" placeholder="mm/t"></div>
+                <div class="input-group"><label>Feed Rate (Vf)</label><input type="number" id="vf" inputmode="numeric" placeholder="mm/min"></div>
+            </div>
+        </div>
+
+        <div class="card results-card">
+            <div class="card-header" style="border:none; margin-bottom:0;">MRR (cm³/min)</div>
+            <div class="mrr-value"><span id="mrr">0.00</span></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Save Data</div>
+            <div class="input-grid">
+                <div class="input-group full-width"><label>Customer / Job</label><input type="text" id="jobRef" placeholder="e.g. ABC Engineering OP10"></div>
+                <div class="input-group"><label>Material</label><input type="text" id="material" placeholder="e.g. EN24T"></div>
+                <div class="input-group"><label>Tool</label><input type="text" id="toolOp" placeholder="e.g. M.A. Ford 277"></div>
+            </div>
+            <button class="action-btn" onclick="saveLog()">Save to Device Storage</button>
+            <button class="action-btn secondary" onclick="clearCalculator()">Clear Calculator</button>
+        </div>
+    </div>
+
+    <div id="tab-compare" class="tab-content">
+        <div class="card">
+            <div class="compare-grid">
+                <div class="col-header col-current">Current Tool</div>
+                <div class="col-header col-proposed">M.A. Ford Tool</div>
+            </div>
+            
+            <div class="compare-row">
+                <div class="input-group"><label>Diameter</label><input type="number" id="c1_d" oninput="calcCompare()"></div>
+                <div class="input-group"><label>Diameter</label><input type="number" id="c2_d" oninput="calcCompare()"></div>
+            </div>
+            <div class="compare-row">
+                <div class="input-group"><label>Flutes</label><input type="number" id="c1_z" oninput="calcCompare()"></div>
+                <div class="input-group"><label>Flutes</label><input type="number" id="c2_z" oninput="calcCompare()"></div>
+            </div>
+            <div class="compare-row">
+                <div class="input-group"><label>Vc (m/min)</label><input type="number" id="c1_vc" oninput="calcCompare()"></div>
+                <div class="input-group"><label>Vc (m/min)</label><input type="number" id="c2_vc" oninput="calcCompare()"></div>
+            </div>
+            <div class="compare-row">
+                <div class="input-group"><label>Fz (mm/t)</label><input type="number" id="c1_fz" oninput="calcCompare()"></div>
+                <div class="input-group"><label>Fz (mm/t)</label><input type="number" id="c2_fz" oninput="calcCompare()"></div>
+            </div>
+            <div class="compare-row">
+                <div class="input-group"><label>AP (Axial)</label><input type="number" id="c1_ap" oninput="calcCompare()"></div>
+                <div class="input-group"><label>AP (Axial)</label><input type="number" id="c2_ap" oninput="calcCompare()"></div>
+            </div>
+            <div class="compare-row">
+                <div class="input-group"><label>AE (Radial)</label><input type="number" id="c1_ae" oninput="calcCompare()"></div>
+                <div class="input-group"><label>AE (Radial)</label><input type="number" id="c2_ae" oninput="calcCompare()"></div>
+            </div>
+        </div>
+
+        <div class="compare-result">
+            <div style="display:flex; justify-content: space-around; margin-bottom: 10px;">
+                <div><label>Current MRR</label><div style="font-weight:bold; font-size:1.2rem;" id="c1_mrr">0.0</div></div>
+                <div><label>Proposed MRR</label><div style="font-weight:bold; font-size:1.2rem; color:var(--primary);" id="c2_mrr">0.0</div></div>
+            </div>
+            <div style="border-top: 1px solid #ddd; padding-top: 10px;">
+                <label>Productivity Increase</label>
+                <div class="gain-text" id="mrr_gain">+0%</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 15px;">
+            <div class="card-header">Cost Justification Analysis</div>
+            <div class="input-grid">
+                <div class="input-group"><label>Machine Rate (£/hr)</label><input type="number" id="cost_rate" placeholder="£" oninput="calcCost()"></div>
+                <div class="input-group"><label>Batch Size (Qty)</label><input type="number" id="cost_batch" placeholder="Qty" oninput="calcCost()"></div>
+                <div class="input-group"><label>Current Cycle Time (min)</label><input type="number" id="cost_time" placeholder="Mins" oninput="calcCost()"></div>
+                <div class="input-group"><label>New Cycle Time (min)</label><input type="number" id="cost_new_time" placeholder="Mins" oninput="calcCost(true)"></div>
+                <div class="input-group"><label>Current Tool Price (£)</label><input type="number" id="cost_tool1" placeholder="£" oninput="calcCost()"></div>
+                <div class="input-group"><label>New Tool Price (£)</label><input type="number" id="cost_tool2" placeholder="£" oninput="calcCost()"></div>
+                <div class="input-group"><label>Current Tool Life (mins)</label><input type="number" id="cost_life1" placeholder="Mins in cut" oninput="calcCost()"></div>
+                <div class="input-group"><label>New Tool Life (mins)</label><input type="number" id="cost_life2" placeholder="Mins in cut" oninput="calcCost()"></div>
+            </div>
+            
+            <div class="compare-result" style="margin-top: 15px; padding: 15px; background: #f8fff9; border: 2px solid var(--success);">
+                
+                <div style="display:flex; justify-content: space-around; margin-bottom: 15px;">
+                    <div style="text-align: center;">
+                        <label style="font-size: 0.9rem; color: #555;">Cost Saved (Per Part)</label>
+                        <div style="font-weight:bold; font-size:1.8rem; color:var(--success); line-height: 1.2;" id="save_money_part">£0.00</div>
+                    </div>
+                    <div style="text-align: center; border-left: 1px solid #ddd; padding-left: 15px;">
+                        <label style="font-size: 0.9rem; color: #555;">Total Saved (Batch)</label>
+                        <div style="font-weight:bold; font-size:1.8rem; color:var(--success); line-height: 1.2;" id="save_money">£0</div>
+                    </div>
+                </div>
+                
+                <div style="display:flex; justify-content: space-around; border-top: 1px solid #ddd; padding-top: 15px;">
+                    <div style="text-align: center;">
+                        <label style="font-size: 0.8rem;">Time Saved</label>
+                        <div style="font-weight:bold; font-size:1.2rem;" id="save_time">0 hrs</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <label style="font-size: 0.8rem;">Extra Rev. Capacity</label>
+                        <div style="font-weight:bold; font-size:1.2rem; color:var(--primary);" id="extra_rev">£0</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="action-btn success" id="pdfBtn" onclick="generateReport()">📄 Generate PDF Report</button>
+        </div>
+    </div>
+
+    <div id="tab-log" class="tab-content">
+        <div class="card">
+            <div class="card-header">Saved History (Local Storage)</div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Job</th><th>Mat</th><th>Tool</th><th>D</th><th>Z</th><th>AP</th><th>AE</th><th>Vc</th><th>RPM</th><th>Fz</th><th>Feed</th><th>MRR</th></tr></thead>
+                    <tbody id="logBody"></tbody>
+                </table>
+            </div>
+            <button class="action-btn secondary" onclick="exportCSV()">Export to CSV</button>
+            <button class="action-btn danger" onclick="clearLogs()">Clear All Data</button>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <button class="nav-btn active" onclick="switchTab('calc', this)">Calculator</button>
+        <button class="nav-btn" onclick="switchTab('compare', this)">Compare</button>
+        <button class="nav-btn" onclick="switchTab('log', this)">Log Book</button>
+    </div>
+
+<script>
+    // --- TAB LOGIC ---
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        btn.classList.add('active');
+        if(tabId === 'log') renderLogs();
+    }
+
+    // --- MAIN CALCULATOR LOGIC ---
+    const el = { dia: document.getElementById('dia'), flutes: document.getElementById('flutes'), ap: document.getElementById('ap'), ae: document.getElementById('ae'), vc: document.getElementById('vc'), rpm: document.getElementById('rpm'), fz: document.getElementById('fz'), vf: document.getElementById('vf'), mrr: document.getElementById('mrr') };
+
+    function calcRPM() { let d = parseFloat(el.dia.value); let vc = parseFloat(el.vc.value); if (d > 0 && vc > 0) { el.rpm.value = Math.round((vc * 1000) / (Math.PI * d)); } else { el.rpm.value = ''; } calcMRR(); }
+    function calcVc() { let d = parseFloat(el.dia.value); let rpm = parseFloat(el.rpm.value); if (d > 0 && rpm > 0) { el.vc.value = ((rpm * Math.PI * d) / 1000).toFixed(0); } else { el.vc.value = ''; } }
+    function calcVf() { let rpm = parseFloat(el.rpm.value); let z = parseFloat(el.flutes.value); let fz = parseFloat(el.fz.value); if (rpm > 0 && z > 0 && fz > 0) { el.vf.value = Math.round(rpm * z * fz); } else { el.vf.value = ''; } calcMRR(); }
+    function calcFz() { let rpm = parseFloat(el.rpm.value); let z = parseFloat(el.flutes.value); let vf = parseFloat(el.vf.value); if (rpm > 0 && z > 0 && vf > 0) { el.fz.value = (vf / (rpm * z)).toFixed(3); } else { el.fz.value = ''; } }
+    function calcMRR() { let ap = parseFloat(el.ap.value); let ae = parseFloat(el.ae.value); let vf = parseFloat(el.vf.value); if (ap > 0 && ae > 0 && vf > 0) { el.mrr.innerText = ((ap * ae * vf) / 1000).toFixed(2); } else { el.mrr.innerText = "0.00"; } }
+    
+    function syncToCompare() {
+        if(el.dia.value) document.getElementById('c2_d').value = el.dia.value; else document.getElementById('c2_d').value = '';
+        if(el.flutes.value) document.getElementById('c2_z').value = el.flutes.value; else document.getElementById('c2_z').value = '';
+        if(el.vc.value) document.getElementById('c2_vc').value = el.vc.value; else document.getElementById('c2_vc').value = '';
+        if(el.fz.value) document.getElementById('c2_fz').value = el.fz.value; else document.getElementById('c2_fz').value = '';
+        if(el.ap.value) document.getElementById('c2_ap').value = el.ap.value; else document.getElementById('c2_ap').value = '';
+        if(el.ae.value) document.getElementById('c2_ae').value = el.ae.value; else document.getElementById('c2_ae').value = '';
+        calcCompare();
+    }
+
+    function updateFromGeometry() { if(el.vc.value) calcRPM(); if(el.fz.value) calcVf(); calcMRR(); syncToCompare(); }
+
+    el.dia.addEventListener('input', updateFromGeometry); el.flutes.addEventListener('input', updateFromGeometry); el.ap.addEventListener('input', () => { calcMRR(); syncToCompare(); }); el.ae.addEventListener('input', () => { calcMRR(); syncToCompare(); });
+    el.vc.addEventListener('input', () => { calcRPM(); calcVf(); syncToCompare(); }); el.rpm.addEventListener('input', () => { calcVc(); calcVf(); syncToCompare(); });
+    el.fz.addEventListener('input', () => { calcVf(); syncToCompare(); }); el.vf.addEventListener('input', () => { calcFz(); calcMRR(); syncToCompare(); });
+
+    function clearCalculator() {
+        const fields = ['dia', 'flutes', 'ap', 'ae', 'vc', 'rpm', 'fz', 'vf', 'jobRef', 'material', 'toolOp'];
+        fields.forEach(id => document.getElementById(id).value = '');
+        document.getElementById('mrr').innerText = '0.00';
+        syncToCompare();
+    }
+
+    // --- COMPARISON LOGIC ---
+    function getCompareMRR(prefix) {
+        let d = parseFloat(document.getElementById(prefix+'_d').value);
+        let z = parseFloat(document.getElementById(prefix+'_z').value);
+        let vc = parseFloat(document.getElementById(prefix+'_vc').value);
+        let fz = parseFloat(document.getElementById(prefix+'_fz').value);
+        let ap = parseFloat(document.getElementById(prefix+'_ap').value);
+        let ae = parseFloat(document.getElementById(prefix+'_ae').value);
+        
+        if(d>0 && z>0 && vc>0 && fz>0 && ap>0 && ae>0) {
+            let rpm = (vc * 1000) / (Math.PI * d);
+            let vf = rpm * z * fz;
+            return (ap * ae * vf) / 1000;
+        }
+        return 0;
+    }
+
+    function calcCompare() {
+        let mrr1 = getCompareMRR('c1');
+        let mrr2 = getCompareMRR('c2');
+        
+        document.getElementById('c1_mrr').innerText = mrr1 > 0 ? mrr1.toFixed(2) : "0.0";
+        document.getElementById('c2_mrr').innerText = mrr2 > 0 ? mrr2.toFixed(2) : "0.0";
+
+        let gainEl = document.getElementById('mrr_gain');
+        if(mrr1 > 0 && mrr2 > 0) {
+            let percent = ((mrr2 - mrr1) / mrr1) * 100;
+            if(percent > 0) {
+                gainEl.innerText = "+" + percent.toFixed(0) + "%";
+                gainEl.style.color = "var(--success)";
+            } else {
+                gainEl.innerText = percent.toFixed(0) + "%";
+                gainEl.style.color = "#dc3545";
+            }
+        } else {
+            gainEl.innerText = "-";
+            gainEl.style.color = "var(--text)";
+        }
+        calcCost(false);
+    }
+
+    // --- FULL COST SAVINGS LOGIC ---
+    function calcCost(manualOverride = false) {
+        let rate = parseFloat(document.getElementById('cost_rate').value) || 0;
+        let batch = parseFloat(document.getElementById('cost_batch').value) || 0;
+        let oldTime = parseFloat(document.getElementById('cost_time').value) || 0;
+        let newTimeEl = document.getElementById('cost_new_time');
+        
+        let tool1Price = parseFloat(document.getElementById('cost_tool1').value) || 0;
+        let tool2Price = parseFloat(document.getElementById('cost_tool2').value) || 0;
+        
+        let life1 = parseFloat(document.getElementById('cost_life1').value) || 0;
+        let life2 = parseFloat(document.getElementById('cost_life2').value) || 0;
+        
+        let mrr1 = parseFloat(document.getElementById('c1_mrr').innerText) || 0;
+        let mrr2 = parseFloat(document.getElementById('c2_mrr').innerText) || 0;
+
+        if(!manualOverride && oldTime > 0 && mrr1 > 0 && mrr2 > 0) {
+            newTimeEl.value = (oldTime * (mrr1 / mrr2)).toFixed(2);
+        }
+        
+        let newTime = parseFloat(newTimeEl.value) || 0;
+        
+        let saveTimeEl = document.getElementById('save_time');
+        let extraRevEl = document.getElementById('extra_rev');
+        let saveMoneyEl = document.getElementById('save_money');
+        let saveMoneyPartEl = document.getElementById('save_money_part');
+
+        if(rate > 0 && batch > 0 && oldTime > 0 && newTime > 0) {
+            let oldMachiningCost = (oldTime / 60) * batch * rate;
+            let newMachiningCost = (newTime / 60) * batch * rate;
+            let hrsSaved = ((oldTime - newTime) / 60) * batch;
+            let extraRevenue = hrsSaved * rate;
+            
+            let oldToolCost = 0; let newToolCost = 0;
+
+            if(life1 > 0) {
+                let toolsNeeded1 = batch / (life1 / oldTime);
+                oldToolCost = toolsNeeded1 * tool1Price;
+            } else { oldToolCost = tool1Price; }
+
+            if(life2 > 0) {
+                let toolsNeeded2 = batch / (life2 / newTime);
+                newToolCost = toolsNeeded2 * tool2Price;
+            } else { newToolCost = tool2Price; }
+
+            let totalOldCost = oldMachiningCost + oldToolCost;
+            let totalNewCost = newMachiningCost + newToolCost;
+            
+            let costSaved = totalOldCost - totalNewCost;
+            let costSavedPerPart = costSaved / batch;
+
+            saveTimeEl.innerText = hrsSaved > 0 ? hrsSaved.toFixed(1) + " hrs" : "0 hrs";
+            extraRevEl.innerText = extraRevenue > 0 ? "£" + extraRevenue.toFixed(0) : "£0";
+            
+            if(costSaved > 0) {
+                saveMoneyEl.innerText = "£" + costSaved.toFixed(0);
+                saveMoneyEl.style.color = "var(--success)";
+                saveMoneyPartEl.innerText = "£" + costSavedPerPart.toFixed(2);
+                saveMoneyPartEl.style.color = "var(--success)";
+            } else if (costSaved < 0) {
+                saveMoneyEl.innerText = "-£" + Math.abs(costSaved).toFixed(0);
+                saveMoneyEl.style.color = "#dc3545"; 
+                saveMoneyPartEl.innerText = "-£" + Math.abs(costSavedPerPart).toFixed(2);
+                saveMoneyPartEl.style.color = "#dc3545";
+            } else {
+                saveMoneyEl.innerText = "£0";
+                saveMoneyEl.style.color = "var(--text)";
+                saveMoneyPartEl.innerText = "£0.00";
+                saveMoneyPartEl.style.color = "var(--text)";
+            }
+        } else {
+            saveTimeEl.innerText = "0 hrs";
+            extraRevEl.innerText = "£0";
+            saveMoneyEl.innerText = "£0";
+            saveMoneyEl.style.color = "var(--text)";
+            saveMoneyPartEl.innerText = "£0.00";
+            saveMoneyPartEl.style.color = "var(--text)";
+        }
+    }
+
+    // --- HTML2PDF REPORT GENERATION ---
+    function generateReport() {
+        const btn = document.getElementById('pdfBtn');
+        btn.innerText = "⏳ Generating PDF...";
+        btn.style.backgroundColor = "#6c757d";
+
+        let job = document.getElementById('jobRef').value || 'Customer';
+        let mat = document.getElementById('material').value || 'Unspecified Material';
+        let batch = document.getElementById('cost_batch').value || 'Not provided';
+        
+        let profit = document.getElementById('save_money').innerText;
+        let profitPart = document.getElementById('save_money_part').innerText;
+        let profitColor = profit.includes('-') ? '#dc3545' : '#28a745';
+
+        const val = (id) => document.getElementById(id).value || '-';
+
+        let htmlContent = `
+            <div style="font-family: Arial, sans-serif; color: #333; padding: 30px;">
+                <div style="border-bottom: 3px solid #0056b3; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h1 style="color: #0056b3; margin: 0;">M.A. Ford Europe</h1>
+                    <h2 style="color: #555; margin: 5px 0 0 0;">Process Optimization Report</h2>
+                </div>
+                
+                <div style="margin-bottom: 20px; font-size: 1.1rem;">
+                    <p><strong>Customer / Job:</strong> ${job}</p>
+                    <p><strong>Material:</strong> ${mat}</p>
+                    <p><strong>Batch Size:</strong> ${batch}</p>
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 1rem;">
+                    <tr style="background-color: #f4f7f6;">
+                        <th style="padding: 12px; border: 1px solid #ddd; text-align:left;">Parameter</th>
+                        <th style="padding: 12px; border: 1px solid #ddd; text-align:center;">Current Process</th>
+                        <th style="padding: 12px; border: 1px solid #ddd; text-align:center; color: #0056b3;">M.A. Ford Proposed</th>
+                    </tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Tool Diameter (mm)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('c1_d')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('c2_d')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Number of Flutes</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('c1_z')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('c2_z')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Surface Speed (m/min)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('c1_vc')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('c2_vc')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Feed Per Tooth (mm/t)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('c1_fz')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('c2_fz')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Axial Depth (mm)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('c1_ap')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('c2_ap')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Radial Depth (mm)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('c1_ae')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('c2_ae')}</td></tr>
+                    <tr style="background-color: #fcfcfc;"><td style="padding: 12px; border: 1px solid #ddd; font-weight:bold;">MRR (cm³/min)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${document.getElementById('c1_mrr').innerText}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold; color:#0056b3;">${document.getElementById('c2_mrr').innerText}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Cycle Time / Part (mins)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('cost_time')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('cost_new_time')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Tool Life (mins in cut)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('cost_life1')}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('cost_life2')}</td></tr>
+                    <tr><td style="padding: 12px; border: 1px solid #ddd;">Tool Price (£)</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center;">${val('cost_tool1') !== '-' ? '£'+val('cost_tool1') : '-'}</td><td style="padding: 12px; border: 1px solid #ddd; text-align:center; font-weight:bold;">${val('cost_tool2') !== '-' ? '£'+val('cost_tool2') : '-'}</td></tr>
+                </table>
+                
+                <div style="margin-top: 40px; border: 2px solid #28a745; border-radius: 8px; padding: 25px; background-color: #f8fff9;">
+                    <h2 style="margin-top: 0; color: #333; text-align: center;">Batch Financial Summary</h2>
+                    <p style="font-size: 1.1em; color: #666; margin-bottom: 25px; text-align: center;">Productivity Increase: <strong>${document.getElementById('mrr_gain').innerText}</strong></p>
+                    
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 25px;">
+                        <div style="text-align: center; border-right: 1px solid #ddd; padding-right: 40px;">
+                            <div style="font-size: 1rem; color: #666; margin-bottom: 5px;">Cost Saved (Per Part)</div>
+                            <div style="font-size: 2.2em; font-weight: bold; color: ${profitColor};">${profitPart}</div>
+                        </div>
+                        <div style="text-align: center; padding-left: 40px;">
+                            <div style="font-size: 1rem; color: #666; margin-bottom: 5px;">Total Saved (Batch)</div>
+                            <div style="font-size: 2.2em; font-weight: bold; color: ${profitColor};">${profit}</div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-around; border-top: 1px solid #ddd; padding-top: 25px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1em; color: #666; margin-bottom: 5px;">Machine Time Saved</div>
+                            <div style="font-size: 1.4em; font-weight: bold;">${document.getElementById('save_time').innerText}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1em; color: #666; margin-bottom: 5px;">Extra Revenue Potential</div>
+                            <div style="font-size: 1.4em; font-weight: bold; color: #0056b3;">${document.getElementById('extra_rev').innerText}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        let filenameStr = job !== 'Customer' ? `${job}_MA_Ford_Report.pdf` : 'MA_Ford_Optimization_Report.pdf';
+        
+        let opt = {
+            margin:       10,
+            filename:     filenameStr,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(htmlContent).save().then(() => {
+            btn.innerText = "📄 Generate PDF Report";
+            btn.style.backgroundColor = "#17a2b8";
+        }).catch(err => {
+            alert("Sorry, an error occurred generating the PDF.");
+            btn.innerText = "📄 Generate PDF Report";
+            btn.style.backgroundColor = "#17a2b8";
+        });
+    }
+
+    // --- LOCAL STORAGE & LOGGING LOGIC ---
+    let logs = JSON.parse(localStorage.getItem('millData')) || [];
+
+    function saveLog() {
+        if(!el.rpm.value && !el.vf.value) return alert("Calculate speeds and feeds before saving!");
+        const entry = {
+            job: document.getElementById('jobRef').value || '-', mat: document.getElementById('material').value || '-', tool: document.getElementById('toolOp').value || '-',
+            d: el.dia.value || '-', z: el.flutes.value || '-', ap: el.ap.value || '-', ae: el.ae.value || '-', vc: el.vc.value || '-', rpm: el.rpm.value || '-', fz: el.fz.value || '-', vf: el.vf.value || '-', mrr: el.mrr.innerText
+        };
+        logs.push(entry);
+        localStorage.setItem('millData', JSON.stringify(logs));
+        alert("Saved to device storage!");
+        
+        document.getElementById('jobRef').value = ''; document.getElementById('material').value = ''; document.getElementById('toolOp').value = '';
+    }
+
+    function renderLogs() {
+        const tbody = document.getElementById('logBody');
+        tbody.innerHTML = '';
+        logs.slice().reverse().forEach(row => {
+            tbody.innerHTML += `<tr><td>${row.job}</td><td>${row.mat}</td><td>${row.tool}</td><td>${row.d}</td><td>${row.z}</td><td>${row.ap}</td><td>${row.ae}</td><td>${row.vc}</td><td>${row.rpm}</td><td>${row.fz}</td><td>${row.vf}</td><td><strong>${row.mrr}</strong></td></tr>`;
+        });
+    }
+
+    function clearLogs() {
+        if(confirm("Are you sure you want to delete all saved data from this device?")) {
+            localStorage.removeItem('millData'); logs = []; renderLogs();
+        }
+    }
+
+    function exportCSV() {
+        if(logs.length === 0) return alert("No data to export!");
+        let csv = "Job,Material,Tool,Dia,Flutes,AP,AE,Vc,RPM,Fz,Feed,MRR\n";
+        logs.forEach(r => { csv += `"${r.job}","${r.mat}","${r.tool}",${r.d},${r.z},${r.ap},${r.ae},${r.vc},${r.rpm},${r.fz},${r.vf},${r.mrr}\n`; });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = 'Milling_Logs.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+</script>
+</body>
+</html>
