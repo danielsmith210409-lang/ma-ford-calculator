@@ -2,7 +2,7 @@
   "name": "MA Ford Calculator",
   "short_name": "MA Ford",
   "display": "standalone",
-  "start_url": "/",
+  "start_url": ".",
   "background_color": "#f4f7f6",
   "theme_color": "#0056b3",
   "icons": [
